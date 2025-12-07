@@ -1,17 +1,34 @@
+require("dotenv").config(); 
 const express = require('express');
 const app = express();
-const port = 3000;
+const mongoose = require("mongoose")
+const authRouter = require("./routes/userRouter");
+const newsRouter = require("./routes/newsRouter"); 
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.listen(port, (err) => {
-    if (err) {
-        return console.log('Something bad happened', err);
-    }
-    console.log(`Server is listening on ${port}`);
-});
+//Authentication Router
+app.use("/users/" , authRouter);
+//news Router
+app.use("/" , newsRouter); 
 
+// Skip MongoDB connection and server.listen during tests
+if (process.env.NODE_ENV !== 'test') {
+    mongoose.connect(process.env.MONGODB_URI)
+    .then(()=> {
+        console.log("The mongoDB database is connected")
+    })
+    .catch((error) => {
+        console.log(error, "MongoDB connetion error"); 
+    });
 
+    app.listen(process.env.PORT , (err) => {
+        if (err) {
+            return console.log('Something bad happened', err);
+        }
+        console.log(`Server is listening on ${process.env.PORT}`);
+    });
+}
 
 module.exports = app;
