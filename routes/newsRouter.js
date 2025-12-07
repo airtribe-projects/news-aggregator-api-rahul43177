@@ -5,4 +5,4 @@ const router = express.Router();
 
 router.get("/news" , authenticateToken, getNews);
 
-module.exports = router; 
+module.exports = router;

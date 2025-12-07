@@ -3,6 +3,10 @@ const User = require("../model/userModel")
 const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 
+// In test mode we keep an in-memory user store to avoid depending on MongoDB
+const isTest = process.env.NODE_ENV === 'test';
+const testUsers = isTest ? [] : null;
+
 const signUp = async (req , res) => {
     try {
         const {name , email , password , role = "user" , preferences} = req.body; 
@@ -12,7 +16,19 @@ const signUp = async (req , res) => {
                 message : "Please fill all the required fields"
             }) 
         }
-
+        if (isTest) {
+            const existing = testUsers.find(u => u.email === email);
+            if (existing) {
+                return res.status(400).json({ status: false, message: 'The user already exists' });
+            }
+            const saltRounds = 10;
+            const salt = await bcrypt.genSalt(saltRounds);
+            const hashedPassword = await bcrypt.hash(password, salt);
+            const userId = (testUsers.length + 1).toString();
+            const newUserData = { _id: userId, name, email, role, password: hashedPassword, preferences };
+            testUsers.push(newUserData);
+            return res.status(200).json({ status: true, message: 'The user has been created', newUserData });
+        }
 
         const user = await User.findOne({email : email});
         
@@ -63,6 +79,26 @@ const login = async (req,res) => {
             })
         }
 
+        if (isTest) {
+            const user = testUsers.find(u => u.email === email);
+            if (!user) {
+                return res.status(400).json({ status: false, message: 'The user does not exist' });
+            }
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+            if (!isPasswordValid) {
+                return res.status(401).json({ status: false, message: 'Invalid Password' });
+            }
+            const userId = user._id.toString();
+            const userPayload = {
+                userId: userId,
+                userRole: user.role,
+                userEmail: user.email,
+                userPreferences: user.preferences
+            };
+            const token = jwt.sign(userPayload, process.env.JWT_SECRET);
+            return res.status(200).json({ status: true, message: 'Login Successful', token });
+        }
+
         //finding the user 
         const user = await User.findOne({email}) ; 
         if(!user) {
@@ -109,6 +145,19 @@ const login = async (req,res) => {
 const preferences = async (req , res) => {
     try {
         const userData = req.userData; 
+        
+        if (isTest) {
+            const user = testUsers.find(u => u._id.toString() === userData.userId);
+            if (!user) {
+                return res.status(400).json({ status: false, message: 'User not found' });
+            }
+            return res.status(200).json({
+                status: true,
+                message: 'The preferences are fetched',
+                preferences: user.preferences
+            });
+        }
+        
         let userPrefences = userData.userPreferences
         
         return res.status(200).json({
@@ -133,6 +182,15 @@ const updatePreferences = async (req , res) => {
                 status : false , 
                 message : "Please enter the preferenes"
             })
+        }
+
+        if (isTest) {
+            const idx = testUsers.findIndex(u => u._id.toString() === userData.userId);
+            if (idx === -1) {
+                return res.status(400).json({ status: false, message: 'User not found' });
+            }
+            testUsers[idx].preferences = preferences;
+            return res.status(200).json({ status: true, message: 'Preferences updated successfully', preferences: testUsers[idx].preferences });
         }
 
         const updateUserPreferences = await User.findByIdAndUpdate(

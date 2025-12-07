@@ -13,21 +13,22 @@ app.use("/users/" , authRouter);
 //news Router
 app.use("/" , newsRouter); 
 
-mongoose.connect(process.env.MONGODB_URI)
-.then(()=> {
-    console.log("The mongoDB database is connected")
-})
-.catch((error) => {
-    console.log(error, "MongoDB connetion error"); 
-});
+// Skip MongoDB connection and server.listen during tests
+if (process.env.NODE_ENV !== 'test') {
+    mongoose.connect(process.env.MONGODB_URI)
+    .then(()=> {
+        console.log("The mongoDB database is connected")
+    })
+    .catch((error) => {
+        console.log(error, "MongoDB connetion error"); 
+    });
 
-app.listen(process.env.PORT , (err) => {
-    if (err) {
-        return console.log('Something bad happened', err);
-    }
-    console.log(`Server is listening on ${process.env.PORT}`);
-});
-
-
+    app.listen(process.env.PORT , (err) => {
+        if (err) {
+            return console.log('Something bad happened', err);
+        }
+        console.log(`Server is listening on ${process.env.PORT}`);
+    });
+}
 
 module.exports = app;
